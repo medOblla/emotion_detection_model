@@ -1,3 +1,4 @@
+from email import message
 import json
 from flask import Flask, request, jsonify, render_template
 import pickle
@@ -22,32 +23,53 @@ def index():
     return "HELLO WORLD"
 
 
-def getEmotion(message):
-    class_names = ['joy', 'fear', 'anger', 'sadness', 'neutral']
-
-    with open('./model/tokenizer.pickle', 'rb') as handle:
-        tokenizerX = pickle.load(handle)
-
-    max_seq_len = 500
+def get_emotion(message):
     seq = tokenizerX.texts_to_sequences(message)
     padded = pad_sequences(seq, maxlen=max_seq_len)
     predX = app.predictor.predict(padded)
+    return class_names[np.argmax(predX)]
 
-    return {"predicted": class_names[np.argmax(predX)]}
+
+def get_percentage(message):
+    seq = tokenizerX.texts_to_sequences(message)
+    padded = pad_sequences(seq, maxlen=max_seq_len)
+    predX = app.predictor.predict(padded)
+    dictionary = dict(zip(class_names, predX[0]*100))
+    for key, value in dictionary.items():
+        dictionary[key] = str(value)
+    return dictionary
 
 
 @app.route('/predict', methods=['POST'])
 def predict():
     data = {'Success': False}
-    # get the request params
     params = request.json
     if (params == None):
         params = request.args
     if (params != None):
         message = params.get('message')
-        data['response'] = getEmotion([message])
+        data['emotion'] = get_emotion([message])
         data['Success'] = True
     return jsonify(data)
+
+
+@app.route('/getPercentage', methods=['POST'])
+def percentage():
+    data = {'Success': False}
+    params = request.json
+    if (params == None):
+        params = request.args
+    if (params != None):
+        message = params.get('message')
+        data['emotion'] = get_percentage([message])
+        data['Success'] = True
+    return jsonify(data)
+
+
+with open('./model/tokenizer.pickle', 'rb') as handle:
+    tokenizerX = pickle.load(handle)
+max_seq_len = 500
+class_names = ['joy', 'fear', 'anger', 'sadness', 'neutral']
 
 
 def main():
